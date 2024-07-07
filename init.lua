@@ -90,7 +90,7 @@ P.S. You can delete this when you're done too. It's your config now! :)
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
--- Set to true if you have a Nerd Font installed and selected in the terminal
+-- Set to true if you have a Nerd Font installed
 vim.g.have_nerd_font = false
 
 -- [[ Setting options ]]
@@ -100,6 +100,7 @@ vim.g.have_nerd_font = false
 
 -- Make line numbers default
 vim.opt.number = true
+vim.opt.relativenumber = true
 -- You can also add relative line numbers, to help with jumping.
 --  Experiment for yourself to see if you like it!
 -- vim.opt.relativenumber = true
@@ -186,7 +187,7 @@ vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' }
 --
 --  See `:help wincmd` for a list of all window commands
 vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left window' })
-vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
+vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'move focus to the right window' })
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 
@@ -227,6 +228,24 @@ vim.opt.rtp:prepend(lazypath)
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
+  'ggandor/leap.nvim',
+  {
+    'adalessa/laravel.nvim',
+    dependencies = {
+      'nvim-telescope/telescope.nvim',
+      'tpope/vim-dotenv',
+      'MunifTanjim/nui.nvim',
+      'nvimtools/none-ls.nvim',
+    },
+  },
+  {
+    'nvim-tree/nvim-tree.lua',
+    config = function()
+      require('nvim-tree').setup()
+      local api = require 'nvim-tree.api'
+      vim.keymap.set('n', '<leader>t', api.tree.toggle)
+    end,
+  },
 
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
@@ -286,13 +305,7 @@ require('lazy').setup({
         ['<leader>r'] = { name = '[R]ename', _ = 'which_key_ignore' },
         ['<leader>s'] = { name = '[S]earch', _ = 'which_key_ignore' },
         ['<leader>w'] = { name = '[W]orkspace', _ = 'which_key_ignore' },
-        ['<leader>t'] = { name = '[T]oggle', _ = 'which_key_ignore' },
-        ['<leader>h'] = { name = 'Git [H]unk', _ = 'which_key_ignore' },
       }
-      -- visual mode
-      require('which-key').register({
-        ['<leader>h'] = { 'Git [H]unk' },
-      }, { mode = 'v' })
     end,
   },
 
@@ -412,7 +425,7 @@ require('lazy').setup({
     'neovim/nvim-lspconfig',
     dependencies = {
       -- Automatically install LSPs and related tools to stdpath for Neovim
-      { 'williamboman/mason.nvim', config = true }, -- NOTE: Must be loaded before dependants
+      'williamboman/mason.nvim',
       'williamboman/mason-lspconfig.nvim',
       'WhoIsSethDaniel/mason-tool-installer.nvim',
 
@@ -514,36 +527,15 @@ require('lazy').setup({
           -- When you move your cursor, the highlights will be cleared (the second autocommand).
           local client = vim.lsp.get_client_by_id(event.data.client_id)
           if client and client.server_capabilities.documentHighlightProvider then
-            local highlight_augroup = vim.api.nvim_create_augroup('kickstart-lsp-highlight', { clear = false })
             vim.api.nvim_create_autocmd({ 'CursorHold', 'CursorHoldI' }, {
               buffer = event.buf,
-              group = highlight_augroup,
               callback = vim.lsp.buf.document_highlight,
             })
 
             vim.api.nvim_create_autocmd({ 'CursorMoved', 'CursorMovedI' }, {
               buffer = event.buf,
-              group = highlight_augroup,
               callback = vim.lsp.buf.clear_references,
             })
-
-            vim.api.nvim_create_autocmd('LspDetach', {
-              group = vim.api.nvim_create_augroup('kickstart-lsp-detach', { clear = true }),
-              callback = function(event2)
-                vim.lsp.buf.clear_references()
-                vim.api.nvim_clear_autocmds { group = 'kickstart-lsp-highlight', buffer = event2.buf }
-              end,
-            })
-          end
-
-          -- The following autocommand is used to enable inlay hints in your
-          -- code, if the language server you are using supports them
-          --
-          -- This may be unwanted, since they displace some of your code
-          if client and client.server_capabilities.inlayHintProvider and vim.lsp.inlay_hint then
-            map('<leader>th', function()
-              vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
-            end, '[T]oggle Inlay [H]ints')
           end
         end,
       })
@@ -565,9 +557,121 @@ require('lazy').setup({
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
-        -- clangd = {},
+        clangd = {},
+        -- html = {},
         -- gopls = {},
-        -- pyright = {},
+        -- emmet_ls = {
+        --   filetypes = {
+        --     'css',
+        --     'eruby',
+        --     'html',
+        --     'javascript',
+        --     'javascriptreact',
+        --     'less',
+        --     'sass',
+        --     'scss',
+        --     'svelte',
+        --     'pug',
+        --     'typescriptreact',
+        --     'vue',
+        --   },
+        -- },
+        -- svls = {},
+        verible = {
+          cmd = { 'verible-verilog-ls', '--rules_config_search' },
+        },
+        -- intelephense = {
+        --   diagnostics = { enable = true },
+        --   files = {
+        --     maxSize = 10000000,
+        --   },
+        --   settings = {
+        --     environment = {
+        --       includePaths = {
+        --         '/home/dragos/Local Sites/hkjhkj/app/public/wp-content/plugins/woocommerce/includes',
+        --         '/home/dragos/Local Sites/hkjhkj/app/public/wp-includes',
+        --         '/home/dragos/Local Sites/hkjhkj/app/public/wp-content/plugins/laravel-dd',
+        --       },
+        --     },
+        --     stubs = {
+        --       'apache',
+        --       'bcmath',
+        --       'bz2',
+        --       'calendar',
+        --       'com_dotnet',
+        --       'Core',
+        --       'ctype',
+        --       'curl',
+        --       'date',
+        --       'dba',
+        --       'dom',
+        --       'enchant',
+        --       'exif',
+        --       'FFI',
+        --       'fileinfo',
+        --       'filter',
+        --       'fpm',
+        --       'ftp',
+        --       'gd',
+        --       'gettext',
+        --       'gmp',
+        --       'hash',
+        --       'iconv',
+        --       'imap',
+        --       'intl',
+        --       'json',
+        --       'ldap',
+        --       'libxml',
+        --       'mbstring',
+        --       'meta',
+        --       'mysqli',
+        --       'oci8',
+        --       'odbc',
+        --       'openssl',
+        --       'pcntl',
+        --       'pcre',
+        --       'PDO',
+        --       'pdo_ibm',
+        --       'pdo_mysql',
+        --       'pdo_pgsql',
+        --       'pdo_sqlite',
+        --       'pgsql',
+        --       'Phar',
+        --       'posix',
+        --       'pspell',
+        --       'readline',
+        --       'Reflection',
+        --       'session',
+        --       'shmop',
+        --       'SimpleXML',
+        --       'snmp',
+        --       'soap',
+        --       'sockets',
+        --       'sodium',
+        --       'SPL',
+        --       'sqlite3',
+        --       'standard',
+        --       'superglobals',
+        --       'sysvmsg',
+        --       'sysvsem',
+        --       'sysvshm',
+        --       'tidy',
+        --       'tokenizer',
+        --       'xml',
+        --       'xmlreader',
+        --       'xmlrpc',
+        --       'xmlwriter',
+        --       'xsl',
+        --       'Zend OPcache',
+        --       'zip',
+        --       'zlib',
+        --       'wordpress',
+        --       'phpunit',
+        --     },
+        --   },
+        -- },
+        -- cssls = {},
+        pyright = {},
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -607,6 +711,10 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        -- 'blade-formatter',
+        -- 'psalm',
+        -- 'phpcs',
+        'prisma-language-server',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
@@ -627,33 +735,25 @@ require('lazy').setup({
 
   { -- Autoformat
     'stevearc/conform.nvim',
-    lazy = false,
-    keys = {
-      {
-        '<leader>f',
-        function()
-          require('conform').format { async = true, lsp_fallback = true }
-        end,
-        mode = '',
-        desc = '[F]ormat buffer',
-      },
-    },
     opts = {
       notify_on_error = false,
       format_on_save = function(bufnr)
         -- Disable "format_on_save lsp_fallback" for languages that don't
         -- have a well standardized coding style. You can add additional
         -- languages here or re-enable it for the disabled ones.
-        local disable_filetypes = { c = true, cpp = true }
+        local disable_filetypes = { c = true, cpp = true, php = true, css = true }
         return {
           timeout_ms = 500,
           lsp_fallback = not disable_filetypes[vim.bo[bufnr].filetype],
         }
       end,
       formatters_by_ft = {
+        verilog = { { 'verible-verilog-lint', 'verible-verilog-format' } },
+        systemverilog = { { 'verible-verilog-lint', 'verible-verilog-format' } },
         lua = { 'stylua' },
         -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
+        python = { 'black' },
+        -- php = { 'blade-formatter' },
         --
         -- You can use a sub-list to tell conform to run *until* a formatter
         -- is found.
@@ -729,13 +829,7 @@ require('lazy').setup({
           -- Accept ([y]es) the completion.
           --  This will auto-import if your LSP supports it.
           --  This will expand snippets if the LSP sent a snippet.
-          ['<C-y>'] = cmp.mapping.confirm { select = true },
-
-          -- If you prefer more traditional completion keymaps,
-          -- you can uncomment the following lines
-          --['<CR>'] = cmp.mapping.confirm { select = true },
-          --['<Tab>'] = cmp.mapping.select_next_item(),
-          --['<S-Tab>'] = cmp.mapping.select_prev_item(),
+          ['<CR>'] = cmp.mapping.confirm { select = true },
 
           -- Manually trigger a completion from nvim-cmp.
           --  Generally you don't need this, because nvim-cmp will display
@@ -812,6 +906,18 @@ require('lazy').setup({
       -- - sr)'  - [S]urround [R]eplace [)] [']
       require('mini.surround').setup()
 
+      local animate = require 'mini.animate'
+      animate.setup {
+        scroll = { timing = animate.gen_timing.linear { duration = 30, unit = 'total' } },
+        cursor = { enable = false },
+        resize = { enable = false },
+        open = { enable = false },
+        close = { enable = false },
+      }
+
+      require('mini.trailspace').setup()
+      require('mini.pairs').setup()
+
       -- Simple and easy statusline.
       --  You could remove this setup call if you don't like it,
       --  and try some other statusline plugin
@@ -835,7 +941,7 @@ require('lazy').setup({
     'nvim-treesitter/nvim-treesitter',
     build = ':TSUpdate',
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'vim', 'vimdoc' },
+      ensure_installed = { 'bash', 'c', 'html', 'lua', 'markdown', 'vim', 'vimdoc' },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -850,8 +956,6 @@ require('lazy').setup({
     config = function(_, opts)
       -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
 
-      -- Prefer git instead of curl in order to improve connectivity in some environments
-      require('nvim-treesitter.install').prefer_git = true
       ---@diagnostic disable-next-line: missing-fields
       require('nvim-treesitter.configs').setup(opts)
 
@@ -876,9 +980,6 @@ require('lazy').setup({
   -- require 'kickstart.plugins.debug',
   -- require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
-  -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
@@ -907,6 +1008,11 @@ require('lazy').setup({
     },
   },
 })
+
+vim.keymap.set('n', 'm', '<Plug>(leap)')
+vim.keymap.set('n', 'M', '<Plug>(leap-from-window)')
+vim.keymap.set({ 'x', 'o' }, 'm', '<Plug>(leap-forward)')
+vim.keymap.set({ 'x', 'o' }, 'M', '<Plug>(leap-backward)')
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
